@@ -1,15 +1,41 @@
-#include "tree.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-
+#include <string.h>
+#include "tree.h"
+#include "utils.h"
 typedef enum
 {
     PARSE_START,
-    PARSE_NODE_TAG_IN,
-    PARSE_NODE_IN,
-    PARSE_NODE_TAG_OUT
+    TAG_IN,
+    TAG_NAME,
+    TAG_ATTR_NAME,
+    TAG_ATTR_VALUE,
+    TAG_CLOSE,
+    TAG_OUT
 } parsing_state_t;
+
+// XML Parsing rules
+/*
+Rules:
+
+    One root element only (<data>...</data>)
+
+    Every tag must close (</likeThis>)
+
+    Attributes in quotes (key="value")
+
+    Tags must nest properly (<a><b></b></a>, not <a><b></a></b>)
+
+    Case-sensitive! <Title> ≠ <title>
+*/
+
+/*
+@parameters:
+    xmldoc -> C-string pointing to a valid XML document
+@returns Pointer to the root node of the parsed tree, NULL pointer if parsing fails
+
+*/
 
 node_t *xml_parse(const char *xmldoc)
 {
@@ -18,11 +44,13 @@ node_t *xml_parse(const char *xmldoc)
     parsing_state_t parsingState = PARSE_START;
     node_t *root = node_create(NULL, NULL);
     node_t *traverser = root;
-    char *ptr = (char *)(void *)xmldoc;
-    char buffer[256];
-    uint16_t bufferPos = 0;
-    int64_t tagid = 1;
+    char *ptr = (char*)xmldoc;
+    array_t buffer = {};
+    array_t keyBuffer = {};
+    array_t valueBuffer = {};
+    attr_t* attrBuffer = NULL;
 
+    // Parsing loop
     while (*ptr)
     {
         switch (parsingState)
@@ -30,57 +58,123 @@ node_t *xml_parse(const char *xmldoc)
         case PARSE_START:
             if (*ptr == '<')
             {
-                parsingState = PARSE_NODE_TAG_IN;
+                parsingState = TAG_IN;
             }
             break;
-        case PARSE_NODE_TAG_IN:
-            if (*ptr != '>')
+        case TAG_IN:
+            if (*ptr == '>')
             {
-                buffer[bufferPos++] = *ptr;
+                // Add a child node to the current node, set its data to the parsed opening tag and reset buffers
+                traverser = node_add_child(traverser);
+                strncpy(traverser->name, buffer.data, sizeof(buffer.data) - 1);
+                node_add_attribute(traverser, attrBuffer);
+                 traverser->type = ELEM_TYPE;
+                printf("Opened <%s>\n", traverser->name);
+                printf("Attributes:\n");
+                node_attr_foreach(traverser->attrs, print_attr);
+
+                array_reset(&buffer);
+                array_reset(&keyBuffer);
+                array_reset(&valueBuffer);
+                // TODO: Implement Arena lifecycle
+                attrBuffer = NULL;
+                parsingState = TAG_CLOSE;
             }
             else
             {
-                // Add a child node to the curent node,set its data to the parsed opening tag and reset the buffer
-                traverser = node_add_child(traverser);
-                node_set_data(traverser, buffer);
-                printf("Opened <%s i_id='%ld'>\n", traverser->data, tagid);
-                bufferPos = 0;
-                memset(buffer, 0, sizeof(buffer));
-                parsingState = PARSE_NODE_IN;
-                tagid++;
+                ptr--;
+                parsingState = TAG_NAME;
             }
             break;
-        case PARSE_NODE_IN:
-            // check if opening or closing 
+        case TAG_NAME:
+
+            if (*ptr == ' ')
+            {
+                parsingState = TAG_ATTR_NAME;
+            }
+            else if (*ptr == '>')
+            {
+                parsingState = TAG_IN;
+            }
+
+            else
+            {
+                buffer.data[buffer.pos++] = *ptr;
+            }
+            break;
+
+        case TAG_ATTR_NAME:
+            if (*ptr != '=')
+            {
+                keyBuffer.data[keyBuffer.pos++] = *ptr;
+            }
+            else
+            {
+                // check if attribute value starts with a double quotation mark
+
+                if (*(ptr + 1) == '"')
+                {
+                    ptr++;
+                    parsingState = TAG_ATTR_VALUE;
+                }
+                else
+                {
+                    fprintf(stderr, "Invalid XML document \n");
+                }
+            }
+            break;
+        case TAG_ATTR_VALUE:
+            if (*ptr == '"')
+            {
+                if (!attrBuffer)
+                {
+                    attrBuffer = attr_create(keyBuffer.data, valueBuffer.data);
+                }
+                else
+                {
+                    attrBuffer->next = attr_create(keyBuffer.data, valueBuffer.data);
+                }
+                array_reset(&keyBuffer);
+                array_reset(&valueBuffer);
+                parsingState = TAG_IN;
+            }
+            else
+            {
+                valueBuffer.data[valueBuffer.pos++] = *ptr;
+            }
+            break;
+        case TAG_CLOSE:
+            // check if opening or closing
             if (*ptr == '<' && *(ptr + 1) == '/')
             {
                 ptr++;
-                parsingState = PARSE_NODE_TAG_OUT;
+                parsingState = TAG_OUT;
             }
             else if (*ptr == '<' && *(ptr + 1) != '/')
             {
-                parsingState = PARSE_NODE_TAG_IN;
+                parsingState = TAG_IN;
             }
             break;
-        case PARSE_NODE_TAG_OUT:
+        case TAG_OUT:
             if (*ptr != '>')
             {
-                buffer[bufferPos++] = *ptr;
+                buffer.data[buffer.pos++] = *ptr;
             }
             else
             {
-                printf("Comparing '%s' and '%s'\n", traverser->data, buffer);
-                if (strncmp(traverser->data, buffer, sizeof(buffer) - 1) == 0)
+                printf("Comparing '%s' and '%s'\n", traverser->name, buffer.data);
+                if (strncmp(traverser->name, buffer.data, sizeof(buffer.data) - 1) == 0)
                 {
-                    printf("Closing <%s>\n", traverser->data);
+                    printf("Closing <%s>\n", traverser->name);
                     traverser = traverser->parent;
-                    bufferPos = 0;
-                    memset(buffer, 0, sizeof(buffer));
+                    array_reset(&buffer);
+                    array_reset(&keyBuffer);
+                    array_reset(&valueBuffer);
                     parsingState = PARSE_START;
                 }
                 else
                 {
-                    fprintf(stderr, "Tag <%s> opened but not closed\n", traverser->data);
+                    fprintf(stderr, "Tag <%s> opened but not closed\n", traverser->name);
                     traverser = traverser->parent;
                 }
             }
@@ -93,13 +187,11 @@ node_t *xml_parse(const char *xmldoc)
     return root;
 }
 
-
 int main()
 {
-    node_t* tree = ("<p>"
-              "<Child4></Child4>"
-              "<Child2>"
-              "<Child3>"
-              "</p>");
+     xml_parse("<p Name=\"Paragraph\">"
+                    "<Child4 Name=\"Test\" Class=\"Blue\"></Child4>"
+                    "<Child2>"
+                    "</p>");
     return 0;
 }
