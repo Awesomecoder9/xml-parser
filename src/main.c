@@ -1,39 +1,43 @@
+#include "string.h"
+
+#include "tree.h"
+#include "utils.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "tree.h"
-#include "utils.h"
+// TODO: Implement Arena lifecycle to avoid memory leaks
+// NOTE: Final version should be a library, previous versions are executables for easier testing
 typedef enum
 {
+    // Initial state
     PARSE_START,
+    // When encountering '<' IN THE OPENING TAG
     TAG_IN,
+    // When encountering any character except ' ' or '>' IN THE OPENING TAG
     TAG_NAME,
+    // When encountering a space then a "key"= IN THE OPENING TAG
     TAG_ATTR_NAME,
+    // When encountering ="value" IN THE OPENING TAG
     TAG_ATTR_VALUE,
-    TAG_CLOSE,
+    // When encountering "</"
     TAG_OUT
 } parsing_state_t;
 
 // XML Parsing rules
 /*
 Rules:
-
     One root element only (<data>...</data>)
-
     Every tag must close (</likeThis>)
-
     Attributes in quotes (key="value")
-
     Tags must nest properly (<a><b></b></a>, not <a><b></a></b>)
-
     Case-sensitive! <Title> ≠ <title>
 */
 
 /*
 @parameters:
     xmldoc -> C-string pointing to a valid XML document
-@returns Pointer to the root node of the parsed tree, NULL pointer if parsing fails
+@returns pointer to the root node of the parsed tree, NULL pointer if parsing fails
 
 */
 
@@ -53,10 +57,20 @@ node_t *xml_parse(const char *xmldoc)
     // Parsing loop
     while (*ptr)
     {
+        uint32_t codepoint;
+        int nbytes = utf8_parse(ptr, &codepoint);
+
         switch (parsingState)
         {
         case PARSE_START:
-            if (*ptr == '<')
+            if (*ptr == '<' && *(ptr + 1) == '/')
+            {
+                nbytes = utf8_parse(ptr, &codepoint);
+                ptr += nbytes;
+                //ptr++;
+                parsingState = TAG_OUT;
+            }
+            else if (*ptr == '<' && *(ptr + 1) != '/')
             {
                 parsingState = TAG_IN;
             }
@@ -76,27 +90,38 @@ node_t *xml_parse(const char *xmldoc)
                 array_reset(&buffer);
                 array_reset(&keyBuffer);
                 array_reset(&valueBuffer);
-                // TODO: Implement Arena lifecycle
+
                 attrBuffer = NULL;
-                parsingState = TAG_CLOSE;
+                parsingState = PARSE_START;
             }
             else
             {
-                ptr--;
+                do {
+                    ptr--;
+                    nbytes = utf8_parse(ptr, &codepoint);
+                }while (nbytes == -1);
+                //ptr--;
                 parsingState = TAG_NAME;
             }
             break;
         case TAG_NAME:
-
+        /*
+         *If encounters space, handles attribute key. Else, fills the buffer with the tag name or
+        goes back to inside the tag(<>)*/
             if (*ptr == ' ')
             {
                 parsingState = TAG_ATTR_NAME;
             }
             else if (*ptr == '>')
             {
+                do
+                {
+                    ptr--;
+                    nbytes = utf8_parse(ptr, &codepoint);
+                } while (nbytes == -1);
+                //ptr--;
                 parsingState = TAG_IN;
             }
-
             else
             {
                 buffer.data[buffer.pos++] = *ptr;
@@ -114,7 +139,9 @@ node_t *xml_parse(const char *xmldoc)
 
                 if (*(ptr + 1) == '"')
                 {
-                    ptr++;
+                    nbytes = utf8_parse(ptr, &codepoint);
+                    ptr += nbytes;
+                    // ptr++;
                     parsingState = TAG_ATTR_VALUE;
                 }
                 else
@@ -124,6 +151,11 @@ node_t *xml_parse(const char *xmldoc)
             }
             break;
         case TAG_ATTR_VALUE:
+            /* If done filling buffer with the attr value,
+             * creates a new attr_t and appends it to the linked list
+             * which will be finally appended to the new child node
+             * at the tag close(</>)
+             */
             if (*ptr == '"')
             {
                 if (!attrBuffer)
@@ -141,18 +173,6 @@ node_t *xml_parse(const char *xmldoc)
             else
             {
                 valueBuffer.data[valueBuffer.pos++] = *ptr;
-            }
-            break;
-        case TAG_CLOSE:
-            // check if opening or closing
-            if (*ptr == '<' && *(ptr + 1) == '/')
-            {
-                ptr++;
-                parsingState = TAG_OUT;
-            }
-            else if (*ptr == '<' && *(ptr + 1) != '/')
-            {
-                parsingState = TAG_IN;
             }
             break;
         case TAG_OUT:
@@ -180,8 +200,7 @@ node_t *xml_parse(const char *xmldoc)
             }
             break;
         }
-
-        ptr++;
+        ptr += nbytes;
     }
     printf("Parsing completed\n");
     return root;
@@ -189,9 +208,12 @@ node_t *xml_parse(const char *xmldoc)
 
 int main()
 {
-     xml_parse("<p Name=\"Paragraph\">"
-                    "<Child4 Name=\"Test\" Class=\"Blue\"></Child4>"
-                    "<Child2>"
-                    "</p>");
+     xml_parse("<p🤷>"
+                    "<Child4 Name=\"💔\" Class=\"Blue\"></Child4>"
+                    "<video Src=\"Test\" Class=\"image_large\"></video>"
+                    "<div width=\"34\">"
+                    "<img src=\"g.jpg\"></img>"
+                    "</div>"
+                    "</p🤷>");
     return 0;
 }

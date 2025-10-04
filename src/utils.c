@@ -1,4 +1,7 @@
 #include "utils.h"
+#include "string.h"
+#include <stdlib.h>
+
 
 void print_attr(const char *key, const char* value)
 {

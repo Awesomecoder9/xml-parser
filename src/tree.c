@@ -1,11 +1,22 @@
 #include <stdio.h>
 #include "tree.h"
-#include "utils.h"
 
+arena_t arena;
+
+__attribute__((constructor))
+void ctor()
+{
+    arena_init(&arena, KB(10));
+}
+__attribute__((destructor))
+void dtor()
+{
+    arena_free(&arena);
+}
 
 node_t *node_create(char *name, node_t *parent)
 {
-    node_t *node = (node_t *)malloc(sizeof(node_t));
+    node_t *node = arena_alloc(&arena, sizeof(node_t), __alignof(node_t));
     node->name = name;
     node->parent = parent;
     return node;
@@ -17,9 +28,10 @@ node_t *node_add_child( node_t *node)
     if (firstChild == NULL)
     {
         firstChild = node_create(NULL, node);
-        firstChild->name = (char*)malloc(BUFFER_SIZE);
+        node->first_child = firstChild;
+        firstChild->name = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));
         memset(firstChild->name,0,BUFFER_SIZE);
-        firstChild->content = (char*)malloc(BUFFER_SIZE);
+        firstChild->content = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
         memset(firstChild->content,0,BUFFER_SIZE);
         return firstChild;
     }
@@ -33,9 +45,9 @@ node_t *node_add_child( node_t *node)
         node_t *newChild = node_create(NULL, node);
         currentSibling->next_sibling = newChild;
 
-        newChild->name = (char*)malloc(BUFFER_SIZE);
+        newChild->name = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
         memset(newChild->name,0,BUFFER_SIZE);
-        newChild->content = (char*)malloc(BUFFER_SIZE);
+        newChild->content = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
         memset(newChild->content,0,BUFFER_SIZE);
 
         return newChild;
@@ -99,11 +111,11 @@ void node_attr_foreach(attr_t *attrs, void (*callback)(const char *, const char 
 
 attr_t* attr_create(const char *key, const char *value)
 {
-    attr_t* newNode = malloc(sizeof(attr_t));
+    attr_t* newNode = arena_alloc(&arena, sizeof(attr_t), __alignof(attr_t));
     memset(newNode, 0, sizeof(attr_t));
-    newNode->name = malloc(BUFFER_SIZE);
+    newNode->name = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
     strncpy(newNode->name, key, BUFFER_SIZE );
-    newNode->value = malloc(BUFFER_SIZE);
+    newNode->value = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
     strncpy(newNode->value, value,BUFFER_SIZE);
 
     return  newNode;
