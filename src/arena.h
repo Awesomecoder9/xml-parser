@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include <stdlib.h>
+
 #define KB(x) (x*1000)
 #define MB(x) (KB(x)*1000)
 #define GB(x) (MB(x)*1000)

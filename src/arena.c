@@ -1,5 +1,5 @@
 #include "arena.h"
-
+#include <stdlib.h>
 #include <stdio.h>
 
 void arena_init(arena_t *arena, const uint64_t size)

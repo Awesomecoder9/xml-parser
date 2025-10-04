@@ -1,13 +1,13 @@
 #include "string.h"
-
 #include "tree.h"
 #include "utils.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-// TODO: Implement Arena lifecycle to avoid memory leaks
-// NOTE: Final version should be a library, previous versions are executables for easier testing
+//TODO: Final version should be a dynamic library
+//TODO: Implement error handling
+
 typedef enum
 {
     // Initial state
@@ -48,11 +48,11 @@ node_t *xml_parse(const char *xmldoc)
     parsing_state_t parsingState = PARSE_START;
     node_t *root = node_create(NULL, NULL);
     node_t *traverser = root;
-    char *ptr = (char*)xmldoc;
+    register char *ptr = (char *)xmldoc;
     array_t buffer = {};
     array_t keyBuffer = {};
     array_t valueBuffer = {};
-    attr_t* attrBuffer = NULL;
+    attr_t *attrBuffer = NULL;
 
     // Parsing loop
     while (*ptr)
@@ -82,7 +82,7 @@ node_t *xml_parse(const char *xmldoc)
                 traverser = node_add_child(traverser);
                 strncpy(traverser->name, buffer.data, sizeof(buffer.data) - 1);
                 node_add_attribute(traverser, attrBuffer);
-                 traverser->type = ELEM_TYPE;
+                traverser->type = ELEM_TYPE;
                 printf("Opened <%s>\n", traverser->name);
                 printf("Attributes:\n");
                 node_attr_foreach(traverser->attrs, print_attr);
@@ -96,18 +96,19 @@ node_t *xml_parse(const char *xmldoc)
             }
             else
             {
-                do {
+                do
+                {
                     ptr--;
                     nbytes = utf8_parse(ptr, &codepoint);
-                }while (nbytes == -1);
+                } while (nbytes == -1);
                 //ptr--;
                 parsingState = TAG_NAME;
             }
             break;
         case TAG_NAME:
-        /*
-         *If encounters space, handles attribute key. Else, fills the buffer with the tag name or
-        goes back to inside the tag(<>)*/
+            /*
+             *If encounters space, handles attribute key. Else, fills the buffer with the tag name or
+            goes back to inside the tag(<>)*/
             if (*ptr == ' ')
             {
                 parsingState = TAG_ATTR_NAME;
@@ -208,12 +209,12 @@ node_t *xml_parse(const char *xmldoc)
 
 int main()
 {
-     xml_parse("<p🤷>"
-                    "<Child4 Name=\"💔\" Class=\"Blue\"></Child4>"
-                    "<video Src=\"Test\" Class=\"image_large\"></video>"
-                    "<div width=\"34\">"
-                    "<img src=\"g.jpg\"></img>"
-                    "</div>"
-                    "</p🤷>");
+    node_traverse(xml_parse("<p🤷>"
+                      "<Child4 Name=\"💔\" Class=\"Blue\"></Child4>"
+                      "<video Src=\"Test\" Class=\"image_large\"></video>"
+                      "<div width=\"34\">"
+                      "<img src=\"g.jpg\"></img>"
+                      "</div>"
+                      "</p🤷>"), print_tree);
     return 0;
 }

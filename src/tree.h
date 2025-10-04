@@ -1,8 +1,4 @@
 #pragma once
-#include <stdlib.h>
-#include <string.h>
-#include "utils.h"
-#include "arena.h"
 
 typedef struct attr_t
 {
@@ -33,7 +29,7 @@ typedef struct node_t
 node_t *node_create(char *name, node_t *parent);
 node_t *node_add_child(node_t *);
 void node_add_attribute(node_t *, attr_t*);
-node_t *node_traverse(node_t *, void (*callback)(void *));
+node_t *node_traverse(node_t *, void (*callback)(const void *));
 
 //Insert a node at the beginning of the linked list
 void node_attr_push_front( attr_t**);

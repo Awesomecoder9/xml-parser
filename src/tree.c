@@ -1,5 +1,9 @@
 #include <stdio.h>
 #include "tree.h"
+#include <stdlib.h>
+#include <string.h>
+#include "utils.h"
+#include "arena.h"
 
 arena_t arena;
 
@@ -8,6 +12,7 @@ void ctor()
 {
     arena_init(&arena, KB(10));
 }
+
 __attribute__((destructor))
 void dtor()
 {
@@ -22,17 +27,17 @@ node_t *node_create(char *name, node_t *parent)
     return node;
 }
 
-node_t *node_add_child( node_t *node)
+node_t *node_add_child(node_t *node)
 {
-    node_t* firstChild = node->first_child;
+    node_t *firstChild = node->first_child;
     if (firstChild == NULL)
     {
         firstChild = node_create(NULL, node);
         node->first_child = firstChild;
         firstChild->name = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));
-        memset(firstChild->name,0,BUFFER_SIZE);
+        memset(firstChild->name, 0,BUFFER_SIZE);
         firstChild->content = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
-        memset(firstChild->content,0,BUFFER_SIZE);
+        memset(firstChild->content, 0,BUFFER_SIZE);
         return firstChild;
     }
     else
@@ -46,17 +51,18 @@ node_t *node_add_child( node_t *node)
         currentSibling->next_sibling = newChild;
 
         newChild->name = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
-        memset(newChild->name,0,BUFFER_SIZE);
+        memset(newChild->name, 0,BUFFER_SIZE);
         newChild->content = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
-        memset(newChild->content,0,BUFFER_SIZE);
+        memset(newChild->content, 0,BUFFER_SIZE);
 
         return newChild;
     }
 }
 
-void node_add_attribute(node_t *node, attr_t* attrs)
+void node_add_attribute(node_t *node, attr_t *attrs)
 {
-    if (!node || !attrs) return;
+    if (!node || !attrs)
+        return;
     if (!node->attrs)
     {
         node->attrs = attrs;
@@ -69,36 +75,45 @@ void node_add_attribute(node_t *node, attr_t* attrs)
         currentAttr = currentAttr->next;
     }
 }
+
 void node_attr_push_front(attr_t **head)
 {
     if (!head)
     {
-       return;
+        return;
     }
-    attr_t* newNode = attr_create(NULL, NULL);
+    attr_t *newNode = attr_create(NULL, NULL);
     newNode->next = *head;
     *head = newNode;
 }
 
-node_t *node_traverse(node_t *tree, void (*callback)(void *))
+node_t *node_traverse(node_t *tree, void (*callback)(const void *))
 {
     node_t *currentNode = tree->first_child;
-    if (currentNode->first_child == NULL)
+    if (!currentNode)
     {
+        if (tree->next_sibling != NULL)
+        {
+            currentNode = tree->next_sibling;
+            callback(currentNode);
+            node_traverse(currentNode, callback);
+            return tree;
+        }
         return tree;
+
     }
+
+    callback(currentNode);
+
     node_traverse(currentNode, callback);
-    if (currentNode->next_sibling != NULL)
-    {
-        currentNode = currentNode->next_sibling;
-        node_traverse(currentNode, callback);
-    }
     return tree;
 }
 
 void node_attr_foreach(attr_t *attrs, void (*callback)(const char *, const char *))
 {
-    if(!attrs){return;
+    if (!attrs)
+    {
+        return;
     }
     const attr_t *currentAttr = attrs;
 
@@ -109,14 +124,14 @@ void node_attr_foreach(attr_t *attrs, void (*callback)(const char *, const char 
     }
 }
 
-attr_t* attr_create(const char *key, const char *value)
+attr_t *attr_create(const char *key, const char *value)
 {
-    attr_t* newNode = arena_alloc(&arena, sizeof(attr_t), __alignof(attr_t));
+    attr_t *newNode = arena_alloc(&arena, sizeof(attr_t), __alignof(attr_t));
     memset(newNode, 0, sizeof(attr_t));
     newNode->name = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
-    strncpy(newNode->name, key, BUFFER_SIZE );
+    strncpy(newNode->name, key, BUFFER_SIZE);
     newNode->value = arena_alloc_array(&arena, sizeof(char), BUFFER_SIZE, __alignof(char));;
     strncpy(newNode->value, value,BUFFER_SIZE);
 
-    return  newNode;
+    return newNode;
 }
