@@ -17,7 +17,6 @@ typedef enum
 
 typedef struct node_t
 {
-    node_type type;
 
     union
     {
@@ -29,6 +28,7 @@ typedef struct node_t
     struct node_t *parent;
     struct node_t *first_child;
     struct node_t *next_sibling;
+    node_type type;
 } node_t;
 
 
@@ -38,4 +38,4 @@ NEXUS_PARSER_API node_t *nexus_node_add_child(node_t *);
 
 NEXUS_PARSER_API void nexus_node_add_attribute(node_t *, attr_t *);
 
-NEXUS_PARSER_API node_t *nexus_node_traverse(node_t *, void (*callback)(const void *));
+NEXUS_PARSER_API void nexus_node_traverse(node_t *, void (*callback)(const node_t *));

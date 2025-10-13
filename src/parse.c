@@ -5,12 +5,16 @@
 #include "internal_utils.h"
 #include "include/arena.h"
 #include "include/parse.h"
+
+#include "include/file.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 //TODO: Final version should be a dynamic library
 //TODO: Implement error handling
+//TODO: Implement permanent and temporary arenas for more efficient allocation
 
 /* XML Parsing rules
 Rules:
@@ -36,7 +40,7 @@ void deallocator(void *ptr)
 __attribute__((constructor))
 void ctor()
 {
-    arena_init(&arena, KB(10));
+    arena_init(&arena, KB(20));
     nexus_internal_string_init(allocator, deallocator);
 }
 
@@ -46,13 +50,29 @@ void dtor()
     arena_free(&arena);
 }
 
+static char nexus_internal_parse_helper_special_chr(const char **ptr)
+{
+    char buf[5] = {0};
+    int counter = -1;
+
+    while (*(++*ptr) != ';')
+    {
+        if (counter > 4)
+        {
+            ptr -= counter;
+        }
+        counter++;
+        buf[counter] = **ptr;
+    }
+    return nexus_internal_parse_c(buf);
+}
 
 node_t *nexus_xml_parse(const string_t *xmldoc)
 {
     parsing_state_t parsingState = PARSE_START;
     node_t *root = nexus_node_create(NULL, NULL);
     node_t *traverser = root;
-    const register char *ptr = nexus_string_data(xmldoc);
+    const char *ptr = nexus_string_data(xmldoc);
     int index = 0;
     string_t *buffer = nexus_string_alloc(BUFFER_SIZE);
     string_t *keyBuffer = nexus_string_alloc(BUFFER_SIZE);
@@ -60,15 +80,20 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
     attr_t *attrBuffer = NULL;
 
     // Parsing loop
-    while (index <= nexus_string_len(xmldoc))
+    while (index < nexus_string_used(xmldoc))
     {
+
         uint32_t codepoint;
         int32_t nbytes = utf8_parse(ptr, &codepoint);
-
+        assert(nbytes > 0);
         switch (parsingState)
         {
         case PARSE_START:
-            if (*ptr == '<' && *(ptr + 1) == '/')
+            if (*ptr == '<' && *(ptr + 1) == '!' && *(ptr + 2) == '-' && *(ptr + 3) == '-')
+            {
+                parsingState = XML_COMMENT;
+            }
+            else if (*ptr == '<' && *(ptr + 1) == '/')
             {
                 nbytes = utf8_parse(ptr, &codepoint);
                 ptr += nbytes;
@@ -88,11 +113,22 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
                     index--;
                     nbytes = utf8_parse(ptr, &codepoint);
                 } while (nbytes == -1);
-                parsingState = TEXT_TAG;
+                parsingState = TAG_TEXT;
             }
             break;
-        case TEXT_TAG:
-            if (*ptr == '<')
+        case XML_COMMENT:
+            if (*ptr == '-' && *(ptr + 1) == '-' && *(ptr + 2) == '>')
+            {
+                parsingState = PARSE_START;
+                ptr += 2;
+            }
+            break;
+        case TAG_TEXT:
+            if (*ptr == '<' && *(ptr + 1) == '!' && *(ptr + 2) == '-' && *(ptr + 3) == '-')
+            {
+                parsingState = XML_COMMENT;
+            }
+            else if (*ptr == '<')
             {
                 do
                 {
@@ -100,27 +136,42 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
                     index--;
                     nbytes = utf8_parse(ptr, &codepoint);
                 } while (nbytes == -1);
-                traverser = nexus_node_add_child(traverser);
-                nexus_string_cpy(traverser->content, buffer);
+                if (!is_all_whitespace(buffer))
+                {
+                    traverser = nexus_node_add_child(traverser);
+                    nexus_string_cpy(traverser->content, buffer);
+                }
                 nexus_internal_string_reset(buffer);
                 parsingState = PARSE_START;
             }
             else
             {
-                nexus_string_mut_data(buffer)[(*nexus_string_mut_used(buffer))++] = *ptr;
+                if (*ptr == '&')
+                {
+
+                    nexus_string_push(buffer, nexus_internal_parse_helper_special_chr(&ptr));
+                    break;
+                }
+                nexus_string_push(buffer, *ptr);
             }
             break;
         case TAG_IN:
-            if (*ptr == '>')
+            if (*ptr == '>' || (*ptr == '?' && *(ptr + 1) == '>') || (*ptr == '/' && *(ptr + 1) == '>'))
             {
                 // Add a child node to the current node, set its data to the parsed opening tag and reset buffers
-                traverser = nexus_node_add_child(traverser);
+                if (*ptr != '?')
+                    traverser = nexus_node_add_child(traverser);
+                else
+                    ptr++;
                 nexus_string_cpy(traverser->name, buffer);
                 nexus_node_add_attribute(traverser, attrBuffer);
                 traverser->type = ELEM_TYPE;
                 printf("Opened <%s>\n", nexus_string_data(traverser->name));
-                printf("Attributes:\n");
-                nexus_internal_node_attr_foreach(traverser->attrs, print_attr);
+                if (*ptr == '/' && *(ptr + 1) == '>')
+                {
+                    parsingState = TAG_OUT;
+                    break;
+                }
 
                 nexus_internal_string_reset(buffer);
                 nexus_internal_string_reset(keyBuffer);
@@ -129,7 +180,10 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
                 attrBuffer = NULL;
                 parsingState = PARSE_START;
             }
-
+            else if (*ptr == '?')
+            {
+                break;
+            }
             else
             {
                 do
@@ -150,7 +204,7 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
             {
                 parsingState = TAG_ATTR_NAME;
             }
-            else if (*ptr == '>')
+            else if (*ptr == '>' || *ptr == '/')
             {
                 do
                 {
@@ -163,14 +217,19 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
             }
             else
             {
-                nexus_string_mut_data(buffer)[(*nexus_string_mut_used(buffer))++] = *ptr;
+                nexus_string_push(buffer, *ptr);
             }
             break;
 
         case TAG_ATTR_NAME:
             if (*ptr != '=')
             {
-                nexus_string_mut_data(keyBuffer)[(*nexus_string_mut_used(keyBuffer))++] = *ptr;
+                if (*ptr == '&')
+                {
+                    nexus_string_push(keyBuffer, nexus_internal_parse_helper_special_chr(&ptr));
+                    break;
+                }
+                nexus_string_push(keyBuffer, *ptr);
             }
             else
             {
@@ -212,13 +271,19 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
             }
             else
             {
-                nexus_string_mut_data(valueBuffer)[(*nexus_string_mut_used(valueBuffer))++] = *ptr;
+                if (*ptr == '&')
+                {
+
+                    nexus_string_push(valueBuffer, nexus_internal_parse_helper_special_chr(&ptr));
+                    break;
+                }
+                nexus_string_push(valueBuffer, *ptr);
             }
             break;
         case TAG_OUT:
             if (*ptr != '>')
             {
-                nexus_string_mut_data(buffer)[(*nexus_string_mut_used(buffer))++] = *ptr;
+                nexus_string_push(buffer, *ptr);
             }
             else
             {
@@ -244,27 +309,21 @@ node_t *nexus_xml_parse(const string_t *xmldoc)
         }
         ptr += nbytes;
         index += nbytes;
+
     }
     printf("Parsing completed \n");
     return root;
 }
 
-int main()
+int main(int argc, const char **argv)
 {
-    const char *buf = "Hannah Roses";
-    const char *test = "<p🤷>"
-        "<Child4 Name=\"sybau💔\" Class=\"Blue\"></Child4>"
-        "<video Src=\"Test\" Class=\"image_large\"></video>"
-        "<div width=\"34\">"
-        "<img src=\"g.jpg\"></img>"
-        "<book>Lord of the rings</book>"
-        "</div>"
-        "</p🤷>";
+    file_info_t info = nexus_file_stream_open(nexus_string_wrap("/home/plank/Desktop/xml-parser/test.xml"),
+                                              nexus_string_wrap("rb"
+                                                  ));
 
-    string_t *str = nexus_string_wrap(test);
-    string_t *substr = nexus_string_str(nexus_string_wrap(buf), nexus_string_wrap("anna"));
-    printf("Substr - %s\n", nexus_string_data(substr));
+    string_t *str = NULL;
+    nexus_file_stream_read(info, &str);
     nexus_node_traverse(nexus_xml_parse(str), print_tree);
-
+    fclose(info.fp);
     return 0;
 }

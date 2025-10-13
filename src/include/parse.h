@@ -6,7 +6,8 @@ typedef enum
 {
     // Initial state
     PARSE_START,
-    TEXT_TAG,
+    XML_COMMENT,
+    TAG_TEXT,
     // When encountering '<' IN THE OPENING TAG
     TAG_IN,
     // When encountering any character except ' ' or '>' IN THE OPENING TAG

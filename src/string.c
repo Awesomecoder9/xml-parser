@@ -2,6 +2,7 @@
 #include "include/string.h"
 #include "internal_string.h"
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -27,16 +28,27 @@ string_t *nexus_string_cat(string_t *dest, const string_t *src)
     NULL_CHECK_PTR(dest);
     NULL_CHECK_PTR(src);
     IS_OWNED(dest);
-    if (dest->length <= src->length)
-        return NULL;
-    char *lastUsed = NULL;
-
-    for (int i = 0; i <= dest->used; ++i)
+    const uint64_t newUsed = dest->used + src->used;
+    if (newUsed > dest->length)
     {
-        lastUsed = &dest->data[i];
+        char *newData = globalState.allocate(newUsed, sizeof(char), __alignof(char));
+        nexus_memcpy(newData, dest->data, dest->used);
+        dest->data = newData;
+        dest->length = newUsed;
+        dest->used = newUsed - src->used;
     }
-    string_t sub = (string_t){dest->length - dest->used, 0, lastUsed};
+    string_t sub = (string_t){dest->length - dest->used, 0, &dest->data[dest->used]};
     nexus_string_cpy(&sub, src);
+    return dest;
+}
+
+string_t *nexus_string_push(string_t *dest, const char c)
+{
+    NULL_CHECK_PTR(dest);
+    IS_OWNED(dest);
+    if (dest->used == dest->length)
+        return NULL;
+    dest->data[dest->used++] = c;
     return dest;
 }
 
@@ -232,6 +244,7 @@ string_t *nexus_string_alloc(const uint64_t len)
     string_t *newStr = globalState.allocate(1, sizeof(string_t), __alignof(string_t));
     char *data = globalState.allocate(len, sizeof(char), __alignof(char));
     *newStr = (string_t){len, 0, data,true};
+    nexus_memset(data, 0, len);
     return newStr;
 }
 
@@ -264,9 +277,38 @@ uint64_t nexus_string_used(const string_t *str)
     return str->used;
 }
 
-uint64_t *nexus_string_mut_used(const string_t *str)
+uint64_t *nexus_internal_string_mut_used(const string_t *str)
 {
     return &((string_t *)str)->used;
+}
+
+char nexus_internal_parse_c(const char *str)
+{
+    if (nexus_string_cmp(nexus_string_wrap(str), nexus_string_wrap("amp")) == 0)
+    {
+        return '&';
+    }
+    else if (nexus_string_cmp(nexus_string_wrap(str), nexus_string_wrap("apos")) == 0)
+    {
+        return '\'';
+
+    }
+    else if (nexus_string_cmp(nexus_string_wrap(str), nexus_string_wrap("lt")) == 0)
+    {
+        return '<';
+    }
+    else if (nexus_string_cmp(nexus_string_wrap(str), nexus_string_wrap("gt")) == 0)
+    {
+        return '>';
+
+    }
+    else if (nexus_string_cmp(nexus_string_wrap(str), nexus_string_wrap("quot")) == 0)
+    {
+
+        return '\"';
+    }
+    assert(false);
+    return 0;
 }
 
 const char *nexus_string_data(const string_t *str)
@@ -321,3 +363,14 @@ void nexus_internal_string_init(void *(*allocate)(uint64_t, uint64_t, uint64_t),
     globalState.allocate = allocate;
     globalState.deallocate = deallocate;
 };
+
+bool is_all_whitespace(const string_t *str)
+{
+    for (size_t i = 0; i < str->used; i++)
+    {
+        char c = (str->data)[i];
+        if (!isspace((unsigned char)c))
+            return false;
+    }
+    return true;
+}

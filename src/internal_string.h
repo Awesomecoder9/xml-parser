@@ -1,6 +1,7 @@
 #pragma once
 #include "include/string.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 
 struct Global
@@ -24,4 +25,8 @@ uint32_t utf8_parse(const char *str, uint32_t *out);
 
 void nexus_internal_string_init(void *(*allocate)(uint64_t, uint64_t, uint64_t), void (*deallocate)(void *));
 
-uint64_t *nexus_string_mut_used(const string_t *str);
+uint64_t *nexus_internal_string_mut_used(const string_t *str);
+
+char nexus_internal_parse_c(const char *str);
+
+bool is_all_whitespace(const string_t *str);

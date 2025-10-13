@@ -172,6 +172,8 @@ NEXUS_PARSER_API string_t *nexus_string_ncpy(string_t *dest, const string_t *src
  */
 NEXUS_PARSER_API string_t *nexus_string_cat(string_t *dest, const string_t *src);
 
+NEXUS_PARSER_API string_t *nexus_string_push(string_t *dest, const char c);
+
 /**
  * @brief
  * @param str An owned null-terminated string to populate the buffer with
@@ -189,7 +191,6 @@ NEXUS_PARSER_API string_t *nexus_string_alloc(uint64_t len);
 NEXUS_PARSER_API string_t *nexus_string_wrap(const char *str);
 
 NEXUS_PARSER_API string_t *nexus_string_view(const string_t *str, uint64_t pos, uint64_t len);
-
 
 //---- Accessors ----
 NEXUS_PARSER_API uint64_t nexus_string_len(const string_t *str);
