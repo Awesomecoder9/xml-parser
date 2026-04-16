@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Root element test -->
+<library>
+  <book id="1" category="fiction">
+    <title>XML Fundamentals</title>
+    <author>John Doe</author>
+    <price currency="USD">39.95</price>
+  </book>
+  <!-- Nested element test -->
+  <book id="2" category="programming">
+    <title id="5">
+            Advanced C
+        </title>
+    <author>
+      <first>Jane</first>
+      <last>Smith</last>
+    </author>
+    <price currency="EUR">49.99</price>
+  </book>
+  <!-- Empty tag and text mix test -->
+  <note>
+        Reminder: &lt;update&gt; your parser! <br />
+  </note>
+  <!-- Self-closing tag and spacing test -->
+  <metadata created="2025-10-04" updated="2025-10-04" />
+  <div>
+    <p />
+  </div>
+</library>
