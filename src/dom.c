@@ -5,14 +5,15 @@
 #include <string.h>
 #include "include/arena.h"
 
-arena_t arena;
+extern _Thread_local struct Context ctx;
 
 node_t *nexus_node_create(string_t *name, node_t *parent)
 {
-    node_t *node = arena_alloc(&arena, sizeof(node_t), __alignof(node_t));
+    node_t *node = new(ctx.arena, node_t, 1);
+    nexus_memset(node, 0, sizeof(node_t));
     if (!name)
     {
-        node->name = nexus_string_alloc(BUFFER_SIZE);
+        node->name = nexus_string_alloc(ctx.arena,BUFFER_SIZE);
     }
     else
         nexus_string_cpy(node->name, name);
@@ -98,11 +99,11 @@ void nexus_internal_node_attr_foreach(attr_t *attrs, void (*callback)(const stri
 
 attr_t *nexus_internal_attr_create(const string_t *key, const string_t *value)
 {
-    attr_t *newNode = arena_alloc(&arena, sizeof(attr_t), __alignof(attr_t));
+    attr_t *newNode = new(ctx.arena, attr_t, 1);
     nexus_memset(newNode, 0, sizeof(attr_t));
-    newNode->name = nexus_string_alloc(BUFFER_SIZE);
+    newNode->name = nexus_string_alloc(ctx.arena,BUFFER_SIZE);
     nexus_string_cpy(newNode->name, key);
-    newNode->value = nexus_string_alloc(BUFFER_SIZE);
+    newNode->value = nexus_string_alloc(ctx.arena,BUFFER_SIZE);
     nexus_string_cpy(newNode->value, value);
 
     return newNode;

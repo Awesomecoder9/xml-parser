@@ -1,13 +1,14 @@
-CC=gcc
+CC=clang
 BUILD_DIR=build
 SRC_DIR=src
+CCFLAGS=-std=c99 -g -Wall -Werror -fsanitize=address
 
 
 
 all: $(BUILD_DIR)/main
 
 $(BUILD_DIR)/main: $(SRC_DIR)/*.c | $(BUILD_DIR)
-	$(CC) -std=c99 -o $@ $^ -g -Wall -Werror
+	$(CC) $(CCFLAGS) -o $@ $^
 
 
 $(BUILD_DIR):

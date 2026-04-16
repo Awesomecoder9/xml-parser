@@ -1,9 +1,9 @@
 #pragma once
-#include <stdint.h>
 #include "../internal_globals.h"
+#include <stdint.h>
 
 typedef struct i_string_t string_t;
-
+#define NEXUS_STR_FMT(s) (int)nexus_string_len(s), nexus_string_data(s)
 // --- Memory Manipulation Functions ---
 /**
  * @brief Fills a block of memory with a specified byte value.
@@ -33,7 +33,6 @@ NEXUS_PARSER_API void *nexus_memset(void *dest, int c, uint64_t n);
  */
 NEXUS_PARSER_API void *nexus_memcpy(void *dest, const void *src, uint64_t n);
 
-
 // --- Custom String Functions based on `string_t` ---
 
 /**
@@ -47,7 +46,8 @@ NEXUS_PARSER_API void *nexus_memcpy(void *dest, const void *src, uint64_t n);
  * @param accept The string containing characters to search for.
  * @return A @p char* to the character from `str` that matches one of the characters in `accept`.
  */
-NEXUS_PARSER_API const char *nexus_string_pbrk(const string_t *str, const string_t *accept);
+NEXUS_PARSER_API const char *nexus_string_pbrk(const string_t *str,
+                                               const string_t *accept);
 
 /**
  * @brief Finds the first occurrence of a substring.
@@ -62,7 +62,8 @@ NEXUS_PARSER_API const char *nexus_string_pbrk(const string_t *str, const string
  * @return A pointer to the beginning of the located substring within `str`'s data,
  * or `NULL` if the substring is not found.
  */
-NEXUS_PARSER_API string_t *nexus_string_str(const string_t *str, const string_t *token);
+NEXUS_PARSER_API string_t *nexus_string_str(const string_t *str,
+                                            const string_t *token);
 
 /**
  * @brief Reverses a string in place.
@@ -85,9 +86,10 @@ NEXUS_PARSER_API void nexus_string_rev(const string_t *str);
  *
  * @param str The string to be searched.
  * @param c The character to be located.
- * @return The index of the last occurrence of `c` in `str`'s data, or a negative value (e.g., -1) if the character is not found.
+ * @return The index of the last occurrence of `c` in `str`'s data, or a negative value (e.g., -1) if the character is
+ * not found.
  */
-NEXUS_PARSER_API int nexus_string_rchr(const string_t *str, char c);
+NEXUS_PARSER_API int nexus_string_rchr(const string_t *str, const char *c);
 
 /**
  * @brief Locates the first occurrence of a character in a string.
@@ -99,15 +101,16 @@ NEXUS_PARSER_API int nexus_string_rchr(const string_t *str, char c);
  *
  * @param str The string to be searched.
  * @param c The character to be located.
- * @return The index of the first occurrence of `c` in `str`'s data, or a negative value (e.g., -1) if the character is not found.
+ * @return The index of the first occurrence of `c` in `str`'s data, or a negative value (e.g., -1) if the character is
+ * not found.
  */
-NEXUS_PARSER_API int nexus_string_chr(const string_t *str, char c);
+NEXUS_PARSER_API int nexus_string_chr(const string_t *str, const char *c);
 
 /**
  * @brief Compares two strings up to a specified number of characters.
  *
  * The `nexus_string_ncmp()` function lexicographically compares the strings
- * pointed to by `a->data` and `b->data`, but compares at most `n` bytes.
+ * pointed to by `a->data` and `b->data`, but compares at most `n` characters.
  * This works exactly like the standard C library function `strncmp`.
  *
  * @param a The first string structure to be compared.
@@ -116,7 +119,8 @@ NEXUS_PARSER_API int nexus_string_chr(const string_t *str, char c);
  * @return An integer less than, equal to, or greater than zero if `a` is found,
  * respectively, to be less than, to match, or be greater than `b`.
  */
-NEXUS_PARSER_API int nexus_string_ncmp(const string_t *a, const string_t *b, uint64_t n);
+NEXUS_PARSER_API int nexus_string_ncmp(const string_t *a, const string_t *b,
+                                       uint64_t n);
 
 /**
  * @brief Compares two strings.
@@ -143,7 +147,8 @@ NEXUS_PARSER_API int nexus_string_cmp(const string_t *a, const string_t *b);
  * @param src The source string structure.
  * @return Returns the original value of `dest`.
  */
-NEXUS_PARSER_API string_t *nexus_string_cpy(string_t *dest, const string_t *src);
+NEXUS_PARSER_API string_t *
+nexus_string_cpy(string_t *dest, const string_t *src);
 
 /**
  * @brief Copies a specified number of characters from one string to another.
@@ -157,7 +162,8 @@ NEXUS_PARSER_API string_t *nexus_string_cpy(string_t *dest, const string_t *src)
  * @param n The maximum number of characters to copy.
  * @return Returns the original value of `dest`.
  */
-NEXUS_PARSER_API string_t *nexus_string_ncpy(string_t *dest, const string_t *src, uint64_t n);
+NEXUS_PARSER_API string_t *nexus_string_ncpy(string_t *dest,
+                                             const string_t *src, uint64_t n);
 
 /**
  * @brief Appends one string to another.
@@ -170,27 +176,42 @@ NEXUS_PARSER_API string_t *nexus_string_ncpy(string_t *dest, const string_t *src
  * @param src The source string structure to append.
  * @return Returns the original value of `dest`.
  */
-NEXUS_PARSER_API string_t *nexus_string_cat(string_t *dest, const string_t *src);
-
-NEXUS_PARSER_API string_t *nexus_string_push(string_t *dest, const char c);
+NEXUS_PARSER_API string_t *
+nexus_string_cat(string_t *dest, const string_t *src);
 
 /**
- * @brief
- * @param str An owned null-terminated string to populate the buffer with
- * @return a @p string_t* object with data pointing to the str parameter
+ * @brief Appends a character at the end a string.
+ *
+ * Appends a valid UTF-8 character at the end of the string `dest`.
+ * `dest` must have sufficient space for the UTF-8 character.
+ * @param dest the `string_t` object to append the character to.
+ * @param c The valid UTF-8 character to append.
+ * @return the original value of `dest`.
  */
-NEXUS_PARSER_API string_t *nexus_string_from_cstr(const char *str);
+NEXUS_PARSER_API string_t *nexus_string_putc(string_t *dest, const char *c);
 
 // ---- Constructors ----
-NEXUS_PARSER_API string_t *nexus_string_alloc(uint64_t len);
 
 /**
- @brief Used to wrap an emtpy buffer into a @struct string_t
- * @note If str is not empty (not in indeterminate state) meaning it has been written to, use nexus_string_from_cstring or nexus_string_view for a non-owned buffer.
+ * @brief Creates a `string_t` object and copies the buffer contents
+ * @param str An owned null-terminated string to populate the buffer with
+ * @return a @p string_t* object with data copied from the str parameter
  */
-NEXUS_PARSER_API string_t *nexus_string_wrap(const char *str);
+NEXUS_PARSER_API string_t *nexus_string_from_cstr(
+    nexus_arena_t *arena, const char *str);
 
-NEXUS_PARSER_API string_t *nexus_string_view(const string_t *str, uint64_t pos, uint64_t len);
+NEXUS_PARSER_API string_t *nexus_string_alloc(nexus_arena_t *arena,
+                                              uint64_t len);
+
+/**
+ @brief Used to wrap a non-owned C-style buffer into a `string_t`
+ */
+NEXUS_PARSER_API string_t *nexus_string_wrap(nexus_arena_t *arena,
+                                             const char *str);
+
+NEXUS_PARSER_API string_t *nexus_string_view(nexus_arena_t *arena,
+                                             const string_t *str, uint64_t pos,
+                                             uint64_t len);
 
 //---- Accessors ----
 NEXUS_PARSER_API uint64_t nexus_string_len(const string_t *str);
@@ -201,5 +222,6 @@ NEXUS_PARSER_API const char *nexus_string_data(const string_t *str);
 
 NEXUS_PARSER_API char *nexus_string_mut_data(const string_t *str);
 
+NEXUS_PARSER_API void nexus_string_reset(string_t *s);
 
-
+NEXUS_PARSER_API const char *nexus_string_at(const string_t *s, uint64_t pos);

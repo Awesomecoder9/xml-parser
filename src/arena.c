@@ -1,31 +1,25 @@
 #include "include/arena.h"
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-void arena_init(arena_t *arena, const uint64_t size)
+void inline arena_init(nexus_arena_t *arena, const uint64_t size)
 {
-    *arena = (arena_t){
-        .data = malloc(size),
-        .offset = 0,
-        .threshold = size};
+    *arena = (nexus_arena_t){.data = malloc(size), .offset = 0, .threshold = size};
 }
 
-void arena_reset(arena_t *arena)
+void inline arena_reset(nexus_arena_t *arena)
 {
     arena->offset = 0;
 }
 
-void arena_free(arena_t *arena)
+void arena_free(nexus_arena_t *arena)
 {
-    printf("Used %f%% of %ld KB", ((float)arena->offset / arena->threshold) * 100, arena->threshold / KB(1));
+    printf("Used %f%% of %ld KB\n", ((float)arena->offset / arena->threshold) * 100, arena->threshold / KB(1));
     free(arena->data);
-    *arena = (arena_t){
-        .data = NULL,
-        .offset = 0,
-        .threshold = 0};
+    *arena = (nexus_arena_t){.data = NULL, .offset = 0, .threshold = 0};
 }
 
-void *arena_alloc(arena_t *arena, const uint64_t size, const uint64_t align)
+void *internal_arena_alloc(nexus_arena_t *arena, const uint64_t size, const uint64_t align)
 {
     if (!arena || align == 0 || (align & (align - 1)) == 1)
         return NULL;
@@ -39,13 +33,22 @@ void *arena_alloc(arena_t *arena, const uint64_t size, const uint64_t align)
         return NULL;
     arena->offset += size + padding;
     return (void *)ptr;
-
 }
 
-void *arena_alloc_array(arena_t *arena, const uint64_t elemSize, const uint64_t numOfItems, const uint64_t align)
+void *arena_alloc(nexus_arena_t *arena, const uint64_t elemSize, const uint64_t numOfItems, const uint64_t align)
 {
     const uint64_t totalSize = elemSize * numOfItems;
     if (totalSize < elemSize)
         return NULL;
-    return arena_alloc(arena, totalSize, align);
+    return internal_arena_alloc(arena, totalSize, align);
+}
+
+nexus_temp_t inline temp_begin(nexus_arena_t *arena)
+{
+    return (nexus_temp_t){arena->offset, arena};
+}
+
+void inline temp_end(nexus_temp_t temp)
+{
+    temp.arena->offset = temp.originalOffset;
 }

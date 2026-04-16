@@ -1,6 +1,7 @@
 ---
+#clang-format Language: Cpp
 Language:        Cpp
-# BasedOnStyle:  Microsoft
+#BasedOnStyle:  Microsoft
 AccessModifierOffset: -2
 AlignAfterOpenBracket: Align
 AlignArrayOfStructures: None
